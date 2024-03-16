@@ -9,7 +9,7 @@ import (
 
 func main() {
 	email := Kick.GenEmail()
-	kpsdkct := Kick.GetCT()
+	kpsdkct := "024t5uIBGXiN99hup7i3ivsxbWlFI4T2vNafXkr8gK0VGlZjBfHFi5uOTZnYnu7IVRs7jc5WOVK1bWwtUZKBkh7skN1jPLeRpL6BA4VmzvGlcUpNAUldPBREVaef5hxrXYzsivMkW1R3ALTvgCrEHXP7c36rNH" //Kick.GetCT()
 	kick := Kick.CreateClient(Kick.GenUsername("GhostSpirit"), email.Data.GenerateEmail.Email, "qwswqSws1214>", kpsdkct)
 	kick.GetCookies()
 	kick.StartSocket()
@@ -28,12 +28,10 @@ func main() {
 		return
 	}
 	fmt.Printf(`%s:%s:%s`, username, kick.Email, kick.Password)
-	// // kick.RequestTokenProvider()
-	kick.LoginAccount()
+	kick.RequestTokenProvider()
+	kick.LoginAccount("")
 	time.Sleep(3 * time.Second)
 	mailbox = Kick.GetMailBox(email.Data.GenerateEmail.AccessToken)
-	fmt.Println(mailbox)
 	code = strings.Split(mailbox.Data.GetMailList.Mails[0].Subject, " ")[0]
-	kick.SendLoginCode(code)
-	kick.SendMessage("6692367", "Hello")
+	kick.LoginAccount(code)
 }

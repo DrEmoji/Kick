@@ -29,6 +29,26 @@ func (client *Client) grabCookie(domain, cookieName string) string {
 	return ""
 }
 
+// func (client *Client) printCookies(domain string) string {
+// 	_domain, err := url.Parse(fmt.Sprintf(`https://%s`, domain))
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+
+// 	for _, cookie := range client.request.GetCookies(_domain) {
+// 		fmt.Println("Name:", cookie.Name)
+// 		fmt.Println("Value:", cookie.Value)
+// 		fmt.Println("Domain:", cookie.Domain)
+// 		fmt.Println("Path:", cookie.Path)
+// 		fmt.Println("Expires:", cookie.Expires)
+// 		fmt.Println("Secure:", cookie.Secure)
+// 		fmt.Println("HttpOnly:", cookie.HttpOnly)
+// 		fmt.Println()
+// 	}
+
+// 	return ""
+// }
+
 func GetCD() string {
 	client := &http.Client{}
 
@@ -179,6 +199,54 @@ func (client *Client) RequestTokenProvider() {
 	log.Println("successfully requested token provider..")
 }
 
+func (client *Client) GetUser() {
+	log.Println(client.socketID)
+	req, err := http.NewRequest("GET", "https://kick.com/api/v1/user", nil)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	req.Header = http.Header{
+		"User-Agent":                {"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"},
+		"Accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"},
+		"Accept-Language":           {"en-US,en;q=0.5"},
+		"DNT":                       {"1"},
+		"Upgrade-Insecure-Requests": {"1"},
+		"Connection":                {"keep-alive"},
+		"Sec-Fetch-Dest":            {"document"},
+		"Sec-Fetch-Mode":            {"navigate"},
+		"Sec-Fetch-Site":            {"none"},
+		"Sec-Fetch-User":            {"?1"},
+		"Pragma":                    {"no-cache"},
+		"Cache-Control":             {"no-cache"},
+		"X-Socket-ID":               {client.socketID},
+		"Referer":                   {"https://kick.com/"},
+		"Authorization":             {"Bearer " + client.xsrf},
+		"X-XSRF-TOKEN":              {client.xsrf},
+	}
+
+	resp, err := client.request.Do(req)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Println("error: on requesting cookies..")
+		return
+	}
+
+	bodyText, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(bodyText))
+	json.Unmarshal(bodyText, &client.form)
+	log.Println("successfully requested token provider..")
+}
+
 func (client *Client) SendEmail() {
 	req, err := http.NewRequest("POST", "https://kick.com/api/v1/signup/send/email", strings.NewReader(fmt.Sprintf(`{"email":"%s"}`, client.Email)))
 	if err != nil {
@@ -276,7 +344,7 @@ func (client *Client) SendEmailCode(code string) {
 
 func (client *Client) RegisterAccount() (string, error) {
 	payload := fmt.Sprintf(
-		`{"birthdate":"03/27/1995","username":"%s","email":"%s","cf_captcha_token":"","password":"%s","password_confirmation":"%s","agreed_to_terms":true,"%s":"","_kick_token_valid_from":"%s"}`,
+		`{"birthdate":"03/27/1995","username":"%s","email":"%s","cf_captcha_token":"","password":"%s","enable_sms_promo":false,"enable_sms_security":false,"password_confirmation":"%s","agreed_to_terms":true,"%s":"","_kick_token_valid_from":"%s"}`,
 		client.Username,
 		client.Email,
 		client.Password,
@@ -327,6 +395,8 @@ func (client *Client) RegisterAccount() (string, error) {
 	}
 
 	if resp.StatusCode == 200 || resp.StatusCode == 201 {
+		client.session = client.grabCookie("kick.com", "kick_session")
+		fmt.Println(client.session)
 		log.Println("successfully sent register..")
 		return client.Username, nil
 	}
@@ -336,90 +406,44 @@ func (client *Client) RegisterAccount() (string, error) {
 		panic(err)
 	}
 	log.Println("error: on register..")
+	fmt.Println(string(bodyText))
 
 	return client.Username, errors.New(string(bodyText))
 }
 
-func (client Client) LoginAccount() {
+func (client *Client) LoginAccount(code string) {
 	payload := fmt.Sprintf(
-		`{"email":"%s","password":"%s","_kick_token_IRw3oA2PPsYqA6EB":"","_kick_token_valid_from":"%s"}`,
+		`{"email":"%s","password":"%s","_kick_token_IRw3oA2PPsYqA6EB":"","_kick_token_valid_from":"%s","isMobileRequest":true,"one_time_password":"%s"}`,
 		client.Email,
 		client.Password,
 		client.form.EncryptedValidFrom,
+		code,
 	)
 
-	req, err := http.NewRequest("POST", "https://kick.com/login", bytes.NewBufferString(payload))
+	req, err := http.NewRequest("POST", "https://kick.com/mobile/login", bytes.NewBufferString(payload))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	req.Header = http.Header{
-		"User-Agent":      {"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"},
-		"Accept":          {"application/json, text/plain, */*"},
-		"Accept-Language": {"en-US"},
-		"Content-Type":    {"application/json"},
-		"X-Socket-ID":     {client.socketID},
-		"Authorization":   {"Bearer " + client.xsrf},
-		"X-XSRF-TOKEN":    {client.xsrf},
-		"Origin":          {"https://kick.com"},
-		"DNT":             {"1"},
-		"Connection":      {"keep-alive"},
-		"X-Kpsdk-Ct":      {client.xKpsdkCt},
-		"X-Kpsdk-Cd":      {GetCD()},
-		"Referer":         {"https:/`/kick.com/"},
-		"Sec-Fetch-Dest":  {"empty"},
-		"Sec-Fetch-Mode":  {"cors"},
-		"Sec-Fetch-Site":  {"same-origin"},
-		"Pragma":          {"no-cache"},
-		"Cache-Control":   {"no-cache"},
-	}
-
-	// Loop over header names
-	for name, values := range req.Header {
-		// Loop over all values for the name.
-		for _, value := range values {
-			fmt.Println(name, value)
-		}
-	}
-
-	resp, err := client.request.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Response:", string(body))
-}
-
-func (client *Client) Follow(user string) {
-
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://kick.com/api/v2/channels/%s/follow", user), nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	req.Header = http.Header{
-		"User-Agent":      {"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"},
-		"Accept":          {"application/json, text/plain, */*"},
-		"Accept-Language": {"en-US"},
-		"Content-Type":    {"application/json"},
-		"X-Socket-ID":     {client.socketID},
-		"Authorization":   {"Bearer " + client.xsrf},
-		"X-XSRF-TOKEN":    {client.xsrf},
-		"Origin":          {"https://kick.com"},
-		"DNT":             {"1"},
-		"Connection":      {"keep-alive"},
-		"X-Kpsdk-Ct":      {client.xKpsdkCt},
-		"X-Kpsdk-Cd":      {GetCD()},
-		"Referer":         {"https:/`/kick.com/"},
-		"Sec-Fetch-Dest":  {"empty"},
-		"Sec-Fetch-Mode":  {"cors"},
-		"Sec-Fetch-Site":  {"same-origin"},
-		"Pragma":          {"no-cache"},
-		"Cache-Control":   {"no-cache"},
+		"User-Agent":       {"Mozilla/5.0 (Linux; Android 9; SM-G950F Build/PPR1.180610.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.6261.119 Mobile Safari/537.36"},
+		"Accept":           {"application/json, text/plain, */*"},
+		"Accept-Language":  {"en-US"},
+		"Content-Type":     {"application/json"},
+		"X-Socket-ID":      {client.socketID},
+		"Authorization":    {"Bearer " + client.xsrf},
+		"X-XSRF-TOKEN":     {client.xsrf},
+		"X-App-Platform":   {"Android"},
+		"X-Requested-With": {"com.kick.mobile"},
+		"Origin":           {"https://kick.com"},
+		"DNT":              {"1"},
+		"Connection":       {"keep-alive"},
+		"Referer":          {"https:/`/kick.com/"},
+		"Sec-Fetch-Dest":   {"empty"},
+		"Sec-Fetch-Mode":   {"cors"},
+		"Sec-Fetch-Site":   {"same-origin"},
+		"Pragma":           {"no-cache"},
+		"Cache-Control":    {"no-cache"},
 	}
 
 	resp, err := client.request.Do(req)
@@ -433,103 +457,19 @@ func (client *Client) Follow(user string) {
 		log.Fatal(err)
 		return
 	}
-	log.Println("Response:", string(body))
-}
 
-func (client *Client) SendLoginCode(code string) {
-	req, err := http.NewRequest("POST", "https://kick.com/api/v1/signup/verify/login-code", strings.NewReader(fmt.Sprintf(`{"code":"%s"}`, code)))
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	req.Header = http.Header{
-		"User-Agent":      {"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"},
-		"Accept":          {"application/json, text/plain, */*"},
-		"Accept-Language": {"en-US"},
-		"Content-Type":    {"application/json"},
-		"X-Socket-ID":     {client.socketID},
-		"Authorization":   {"Bearer " + client.xsrf},
-		"X-XSRF-TOKEN":    {client.xsrf},
-		"Origin":          {"https://kick.com"},
-		"DNT":             {"1"},
-		"Connection":      {"keep-alive"},
-		"Referer":         {"https:/`/kick.com/"},
-		"Sec-Fetch-Dest":  {"empty"},
-		"Sec-Fetch-Mode":  {"cors"},
-		"X-Kpsdk-Ct":      {client.xKpsdkCt},
-		"X-Kpsdk-Cd":      {GetCD()},
-		"Sec-Fetch-Site":  {"same-origin"},
-		"Pragma":          {"no-cache"},
-		"Cache-Control":   {"no-cache"},
+	var responseMap map[string]interface{}
+	errr := json.Unmarshal(body, &responseMap)
+	if errr != nil {
+		log.Fatal(errr)
 	}
 
-	resp, err := client.request.Do(req)
-	if err != nil {
-		log.Fatal(err)
-		return
+	// Check if "token" field exists in the response
+	token, tokenExists := responseMap["token"].(string)
+	if tokenExists {
+		log.Println("Token:", token)
+		client.Auth = token
+	} else {
+		log.Println("Authenticated")
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 204 {
-		fmt.Println(resp.StatusCode)
-		log.Println("error: on login code send..")
-		bodyText, err := io.ReadAll(resp.Body)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(string(bodyText))
-		return
-	}
-
-	log.Println("successfully sent long code..")
-}
-
-func (client *Client) SendMessage(chatroom string, message string) {
-	payload := fmt.Sprintf(
-		`{"chatroom_id":%s, "message": %s}`,
-		chatroom,
-		message,
-	)
-
-	req, err := http.NewRequest("POST", "https://kick.com/api/v1/chat-messages", strings.NewReader(payload))
-	if err != nil {
-		log.Fatal(err)
-	}
-	req.Header = http.Header{
-		"User-Agent":      {"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"},
-		"Accept":          {"application/json, text/plain, */*"},
-		"Accept-Language": {"en-US"},
-		"Content-Type":    {"application/json"},
-		"X-Socket-ID":     {client.socketID},
-		"Authorization":   {"Bearer " + client.xsrf},
-		"X-XSRF-TOKEN":    {client.xsrf},
-		"Origin":          {"https://kick.com"},
-		"DNT":             {"1"},
-		"Connection":      {"keep-alive"},
-		"X-Kpsdk-Ct":      {client.xKpsdkCt},
-		"X-Kpsdk-Cd":      {GetCD()},
-		"Referer":         {"https:/`/kick.com/"},
-		"Sec-Fetch-Dest":  {"empty"},
-		"Sec-Fetch-Mode":  {"cors"},
-		"Sec-Fetch-Site":  {"same-origin"},
-		"Pragma":          {"no-cache"},
-		"Cache-Control":   {"no-cache"},
-	}
-
-	resp, err := client.request.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 200 || resp.StatusCode == 201 {
-		log.Println("successfully sent message..")
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	log.Println("Response:", string(body))
 }

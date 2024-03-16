@@ -25,6 +25,7 @@ type Client struct {
 	Password string
 	xKpsdkCt string
 	Auth     string
+	session  string
 	socketID string
 	xsrf     string
 	request  tls_client.HttpClient
@@ -76,6 +77,27 @@ func CreateClient(username, email, password, kpsdkct string) *Client {
 		Username: username,
 		Email:    email,
 		xKpsdkCt: kpsdkct,
+		Password: password,
+		request:  client,
+	}
+}
+
+// May be needed in future
+func CreateAndroidClient(email, password string) *Client {
+	options := []tls_client.HttpClientOption{
+		tls_client.WithTimeoutSeconds(30),
+		tls_client.WithClientProfile(tls_client.Chrome_109),
+		tls_client.WithRandomTLSExtensionOrder(),
+		tls_client.WithCookieJar(tls_client.NewCookieJar(tls_client.WithLogger(tls_client.NewLogger()))),
+	}
+
+	client, err := tls_client.NewHttpClient(tls_client.NewNoopLogger(), options...)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return &Client{
+		Email:    email,
 		Password: password,
 		request:  client,
 	}
