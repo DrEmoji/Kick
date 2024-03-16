@@ -29,7 +29,7 @@ func (client *Client) grabCookie(domain, cookieName string) string {
 	return ""
 }
 
-// func (client *Client) printCookies(domain string) string {
+// func (client *Client) printCookies(domain string)  {
 // 	_domain, err := url.Parse(fmt.Sprintf(`https://%s`, domain))
 // 	if err != nil {
 // 		log.Fatal(err)
@@ -45,8 +45,6 @@ func (client *Client) grabCookie(domain, cookieName string) string {
 // 		fmt.Println("HttpOnly:", cookie.HttpOnly)
 // 		fmt.Println()
 // 	}
-
-// 	return ""
 // }
 
 func GetCD() string {
@@ -221,7 +219,7 @@ func (client *Client) GetUser() {
 		"Cache-Control":             {"no-cache"},
 		"X-Socket-ID":               {client.socketID},
 		"Referer":                   {"https://kick.com/"},
-		"Authorization":             {"Bearer " + client.xsrf},
+		"Authorization":             {"Bearer " + client.Auth},
 		"X-XSRF-TOKEN":              {client.xsrf},
 	}
 
@@ -243,8 +241,6 @@ func (client *Client) GetUser() {
 	}
 
 	fmt.Println(string(bodyText))
-	json.Unmarshal(bodyText, &client.form)
-	log.Println("successfully requested token provider..")
 }
 
 func (client *Client) SendEmail() {
@@ -386,14 +382,6 @@ func (client *Client) RegisterAccount() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	// Loop over header names
-	for name, values := range resp.Header {
-		// Loop over all values for the name.
-		for _, value := range values {
-			fmt.Println(name, value)
-		}
-	}
-
 	if resp.StatusCode == 200 || resp.StatusCode == 201 {
 		client.session = client.grabCookie("kick.com", "kick_session")
 		fmt.Println(client.session)
@@ -464,7 +452,6 @@ func (client *Client) LoginAccount(code string) {
 		log.Fatal(errr)
 	}
 
-	// Check if "token" field exists in the response
 	token, tokenExists := responseMap["token"].(string)
 	if tokenExists {
 		log.Println("Token:", token)
@@ -472,4 +459,98 @@ func (client *Client) LoginAccount(code string) {
 	} else {
 		log.Println("Authenticated")
 	}
+}
+
+func (client *Client) ChatMessage(chatid, message string) {
+	payload := fmt.Sprintf(
+		`{"chatroom_id":"%s","message":"%s"}`,
+		chatid,
+		message,
+	)
+
+	req, err := http.NewRequest("POST", "https://kick.com/api/v1/chat-messages", bytes.NewBufferString(payload))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.Header = http.Header{
+		"User-Agent":       {"Mozilla/5.0 (Linux; Android 9; SM-G950F Build/PPR1.180610.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.6261.119 Mobile Safari/537.36"},
+		"Accept":           {"application/json, text/plain, */*"},
+		"Accept-Language":  {"en-US"},
+		"Content-Type":     {"application/json"},
+		"X-Socket-ID":      {client.socketID},
+		"Authorization":    {"Bearer " + client.Auth},
+		"X-XSRF-TOKEN":     {client.xsrf},
+		"X-App-Platform":   {"Android"},
+		"X-Requested-With": {"com.kick.mobile"},
+		"Origin":           {"https://kick.com"},
+		"DNT":              {"1"},
+		"Connection":       {"keep-alive"},
+		"Referer":          {"https:/`/kick.com/"},
+		"Sec-Fetch-Dest":   {"empty"},
+		"Sec-Fetch-Mode":   {"cors"},
+		"Sec-Fetch-Site":   {"same-origin"},
+		"Pragma":           {"no-cache"},
+		"Cache-Control":    {"no-cache"},
+	}
+
+	resp, err := client.request.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	fmt.Println(string(body))
+}
+
+func (client *Client) Follow(user string) {
+	url := fmt.Sprintf(
+		`https://kick.com/api/v1/channels/%s/follow`,
+		user,
+	)
+
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.Header = http.Header{
+		"User-Agent":      {"Mozilla/5.0 (Linux; Android 9; SM-G950F Build/PPR1.180610.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.6261.119 Mobile Safari/537.36"},
+		"Accept":          {"application/json, text/plain, */*"},
+		"Accept-Language": {"en-US"},
+		"Content-Type":    {"application/json"},
+		"X-Socket-ID":     {client.socketID},
+		"Authorization":   {"Bearer " + client.Auth},
+		"X-XSRF-TOKEN":    {client.xsrf},
+		"X-Kpsdk-Ct":      {GetCT()},
+		"X-Kpsdk-Cd":      {GetCD()},
+		"DNT":             {"1"},
+		"Connection":      {"keep-alive"},
+		"Referer":         {"https:/`/kick.com/"},
+		"Sec-Fetch-Dest":  {"empty"},
+		"Sec-Fetch-Mode":  {"cors"},
+		"Sec-Fetch-Site":  {"same-origin"},
+		"Pragma":          {"no-cache"},
+		"Cache-Control":   {"no-cache"},
+	}
+
+	resp, err := client.request.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	fmt.Println(string(body))
 }

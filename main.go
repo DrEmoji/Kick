@@ -34,4 +34,5 @@ func main() {
 	mailbox = Kick.GetMailBox(email.Data.GenerateEmail.AccessToken)
 	code = strings.Split(mailbox.Data.GetMailList.Mails[0].Subject, " ")[0]
 	kick.LoginAccount(code)
+	kick.ChatMessage("2339114", "Hello")
 }
